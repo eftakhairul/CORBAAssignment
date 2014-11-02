@@ -1,0 +1,29 @@
+module library {
+
+	interface LibraryServer{
+	
+		boolean createAccount(in string firstName,
+							  in string lastName,
+							  in string emailAddress,
+							  in string phoneNumber,
+							  in string username,
+							  in  string password,
+							  in string educationalInstitude);
+							  
+		boolean reserveBook(in string username,
+							in string password,
+							in string bookName,
+							in string authorName);
+							
+		string getNonReturn(in string userName,
+						 	in string password,
+							in string educationalInstitude,
+							in short days);
+							
+       boolean reserveInterLibrary(in string username,
+								   in string password,
+								   in string bookName,
+								   in string authorName
+								  );       							
+	};
+};
