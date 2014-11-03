@@ -5,10 +5,12 @@ import java.util.Date;
 /**
  * Book Class
  * 
- * @author Md Eftakhairul Islam 
- * Assignment on RMI Java 
+ * Holding all information of a individual book
+ * 
+ * @author Md Eftakhairul Islam <eftakhairul@gmail.com>
  */
 public class Book {
+	
 	public String 	 bookName;
 	public String 	 authorName; 
 	public int 	  	 size; 
@@ -33,6 +35,8 @@ public class Book {
 	
 	/**
 	 * Making association between student and book 
+	 * 
+	 * @return true|false
 	 */
 	public boolean addBook(String username) {
 		if(this.size == 0) {
@@ -47,6 +51,8 @@ public class Book {
 	
 	/**
 	 *  Search register information by book 
+	 *  
+	 * @return index
 	 */
 	public int searchRegister(String userName) {
 		for(int i = 0; i< this.index; i++)
@@ -58,5 +64,4 @@ public class Book {
 		
 		return -1;
 	}
-
 }
