@@ -76,13 +76,13 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 								 String educationalInstitude) {
 
 		Boolean createRecordFlag = false;
-		Student student = new Student(firstName, 
-									  lastName, 
-									  emailAddress,
-									  phoneNumber, 
-									  username, 
-									  password, 
-									  educationalInstitude);
+		Student student 		 = new Student(firstName, 
+											   lastName, 
+											   emailAddress,
+											   phoneNumber, 
+											   username, 
+											   password, 
+											   educationalInstitude);
 		
 		
 		
@@ -93,10 +93,10 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 				}
 				
 				// Log the operation
-				logFile("multi", "Student name: " + student.firstName + " record is created");
+				logFile("stuend_create", "Student name: " + student.firstName + " record is created");
 				return true;
 			} else {
-				logFile("multi", "Student name: " + student.firstName + " record is failed");
+				logFile("stuend_create", "Student name: " + student.firstName + " record is failed");
 				return false;
 			}		
 	}
@@ -110,7 +110,7 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 	 * @param authorName
 	 * @return boolean
 	 * 
-	 * @throws RemoteException
+	 * @return boolean
 	 */
 	public boolean reserveBook(String username, 
 							   String password,
@@ -124,76 +124,80 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 			return reserveBookeRecordFlag;
 		}
 		
+		//Just for debug
 		logFile("debug", "server: " + student.educationalInstitude);
+		
 		switch (student.educationalInstitude) {
 		
-		// Vanier college
-		case "van": {
-			synchronized (VanLibrary) {
-				Book book = VanLibrary.get(bookName);
-				if (book != null) {
-					if (book.addBook(student.username)) {
-						reserveBookeRecordFlag = true;
-						// Log file create
-						logFile("van", "One book :" + bookName
-								+ " is reserved for student: "
-								+ student.username);
-					} else {
-						reserveBookeRecordFlag = false;
-						logFile("van", "One book :" + bookName
-								+ " is not reserved for student: "
-								+ student.username);
-					}
+			// Vanier college
+			case "van": {
+				
+					Book book = VanLibrary.get(bookName);
+					if (book != null) {
+						synchronized (book) {
+							reserveBookeRecordFlag = book.addBook(student.username);
+						}
+						
+						if (reserveBookeRecordFlag) {						
+							// Log file create
+							logFile("reserve_book", "Vanier: One book :" + bookName
+									+ " is reserved for student: "
+									+ student.username);
+						} else {				
+							logFile("reserve_book", "Vanier: One book :" + bookName
+									+ " is not reserved for student: "
+									+ student.username);
+						}				
 				}
 			}
-		}
-		break;
-		
-		// Concordia University
-		case "con": {
-			synchronized (ConLibrary) {
-				Book book = ConLibrary.get(bookName);
-				if (book != null) {
-					if (book.addBook(student.username)) {
-						reserveBookeRecordFlag = true;
-						// Log file create
-						logFile("con", "One book :" + bookName
-								+ " is reserved for student: "
-								+ student.username);
-					} else {
-						reserveBookeRecordFlag = false;
-						logFile("con", "One book :" + bookName
-								+ " is not reserved for student: "
-								+ student.username);
-					}
+			break;
+			
+			// Concordia University
+			case "con": {		
+					Book book = ConLibrary.get(bookName);
+					if (book != null) {
+						
+						synchronized (book) {
+							reserveBookeRecordFlag = book.addBook(student.username);
+						}
+						
+						if (reserveBookeRecordFlag) {
+							
+							// Log file create
+							logFile("reserve_book", "Concordia: One book :" + bookName
+									+ " is reserved for student: "
+									+ student.username);
+						} else {						
+							logFile("reserve_book", "Concordia: One book :" + bookName
+									+ " is not reserved for student: "
+									+ student.username);
+						}				
 				}
 			}
-		}
-		break;
-		
-		// Dawson College
-		case "dow": {
-			synchronized (DowLibrary) {
-				Book book = DowLibrary.get(bookName);
-				if (book != null) {
-					if (book.addBook(student.username)) {
-						reserveBookeRecordFlag = true;
-						// Log file create
-						logFile("dow", "One book :" + bookName
-								+ " is reserved for student: "
-								+ student.username);
-					} else {
-						reserveBookeRecordFlag = false;
-						logFile("dow", "One book :" + bookName
-								+ " is not reserved for student: "
-								+ student.username);
-					}
+			break;
+			
+			// Dawson College
+			case "dow": {			
+					Book book = DowLibrary.get(bookName);
+					if (book != null) {
+						synchronized (book) {
+							reserveBookeRecordFlag = book.addBook(student.username);
+						}
+						if (reserveBookeRecordFlag) {						
+							// Log file create
+							logFile("reserve_book", "Dawson: One book :" + bookName
+									+ " is reserved for student: "
+									+ student.username);
+						} else {						
+							logFile("reserve_book", "Dawson: One book :" + bookName
+									+ " is not reserved for student: "
+									+ student.username);
+						}				
 				}
 			}
-		}
-		break;
-		default: {
-		}
+			break;
+			
+			default: {}
 			break;
 		}
 		
@@ -201,121 +205,64 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 		return reserveBookeRecordFlag;
 	}
 	
-	@Override
+	/*
+	 * Reserve a book for a student. 
+	 * 
+	 * If book is not inserted own library, then send call to other library
+	 * by UDP call
+	 * 
+	 * @param username
+	 * @param password
+	 * @param bookName
+	 * @param authorName
+	 * @return boolean
+	 * 
+	 * @return boolean
+	 */
 	public boolean reserveInterLibrary(String username, 
 									   String password,
 									   String bookName, 
 									   String authorName) {
-		String message = null;
-		DatagramSocket DPISSocket = null;
-		DatagramSocket DPISSocket1 = null;
-		DatagramSocket DPISSocket2 = null;
-		byte[] buffer = new byte[1000000];
+		
 		
 		boolean output = this.reserveBook(username, 
 									 	  password,
 									      bookName, 
 									      authorName);
 		
+		//if fail, then call to other server by UDP
 		if (output == false) {
 			
-			String mgs = "reserve:"+""+username+":"+bookName;
+			String requestData = "reserve:"+username+":"+bookName;
 			switch (this.instituteName) {			
 			// Vanier college
 			case "van": {
-				try {
-					
-					// UDP server call to Concordia Server
-					DPISSocket = new DatagramSocket();
-					InetAddress aHost = InetAddress.getByName("localhost");					
-					byte[] m = mgs.getBytes();
-					DatagramPacket request = new DatagramPacket(m,
-							mgs.length(), aHost, ConLibraryPort);
-					DPISSocket.send(request);
-					DatagramPacket reply = new DatagramPacket(buffer, buffer.length);
-					DPISSocket.receive(reply);
-					message = new String(reply.getData());
-					
-					// UDP server call to Dowson Collgee
-					DatagramPacket request1 = new DatagramPacket(m,
-							mgs.length(), aHost, DowLibraryPort);
-					DPISSocket.send(request1);
-					DatagramPacket reply1 = new DatagramPacket(buffer,
-							buffer.length);
-					DPISSocket.receive(reply1);
-					message += new String(reply1.getData());
-				} catch (SocketException e) {
-					System.out.println("Socket: " + e.getMessage());
-				} catch (IOException e) {
-					System.out.println("IO: " + e.getMessage());
-				} finally {
-					if (DPISSocket != null)
-						DPISSocket.close();
-				}				
+				String liboutput =  this.processUDPRequest(ConLibraryPort, requestData);				
+				if (liboutput.equals("false")) {
+					output = true;					
+					liboutput =  this.processUDPRequest(DowLibraryPort, requestData);										
+				}
+				
+								
 			}
 			break;
 			
 			// Concordia University
 			case "con": {
-				try {				
-					// UDP server call to Varnier college
-					DPISSocket1 = new DatagramSocket();
-					InetAddress aHost = InetAddress.getByName("localhost");
-					byte[] m = mgs.getBytes();
-					DatagramPacket request = new DatagramPacket(m, mgs.length(),
-							aHost, VanLibraryPort);
-					DPISSocket1.send(request);
-					DatagramPacket reply = new DatagramPacket(buffer, buffer.length);
-					DPISSocket1.receive(reply);
-					message += new String(reply.getData());
-					
-					// UDP server call to Dawson college
-					DatagramPacket request1 = new DatagramPacket(m,
-							"send".length(), aHost, DowLibraryPort);
-					DPISSocket1.send(request1);
-					DatagramPacket reply1 = new DatagramPacket(buffer,
-							buffer.length);
-					DPISSocket1.receive(reply1);
-					message += new String(reply1.getData());
-				} catch (SocketException e) {
-					System.out.println("Socket: " + e.getMessage());
-				} catch (Exception e) {
-					e.printStackTrace();
-				} finally {
-					if (DPISSocket1 != null)
-						DPISSocket1.close();
+				String liboutput =  this.processUDPRequest(ConLibraryPort, requestData);				
+				if (liboutput.equals("false")) {
+					output = true;					
+					liboutput =  this.processUDPRequest(DowLibraryPort, requestData);										
 				}
 			}
 			break;
 			
 			// Dawson College
 			case "dow": {
-				try {				
-					// UDP server call to Varnier college
-					DPISSocket2 = new DatagramSocket();
-					InetAddress aHost = InetAddress.getByName("localhost");
-					byte[] m = mgs.getBytes();
-					DatagramPacket request = new DatagramPacket(m,
-							mgs.length(), aHost, VanLibraryPort);
-					DPISSocket2.send(request);
-					DatagramPacket reply = new DatagramPacket(buffer, buffer.length);
-					DPISSocket2.receive(reply);
-					message += new String(reply.getData());
-					
-					// UDP server call to Concordia University
-					DatagramPacket request1 = new DatagramPacket(m, mgs.length(), aHost, ConLibraryPort);
-					DPISSocket2.send(request1);
-					DatagramPacket reply1 = new DatagramPacket(buffer,
-							buffer.length);
-					DPISSocket2.receive(reply1);
-					message += new String(reply1.getData());
-				} catch (SocketException e) {
-					System.out.println("Socket: " + e.getMessage());
-				} catch (Exception e) {
-					e.printStackTrace();
-				} finally {
-					if (DPISSocket2 != null)
-						DPISSocket2.close();
+				String liboutput =  this.processUDPRequest(ConLibraryPort, requestData);				
+				if (liboutput.equals("false")) {
+					output = true;					
+					liboutput =  this.processUDPRequest(DowLibraryPort, requestData);										
 				}				
 			}
 			break;
@@ -323,8 +270,7 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 			default: {
 			}
 				break;
-			}
-			
+			}			
 		}
 		
 		return true;
@@ -350,167 +296,114 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 			message = "Sorry!!! You are not admin";
 			return message;
 		}
-		String messsage = null;
-		DatagramSocket DPISSocket = null;
-		DatagramSocket DPISSocket1 = null;
-		DatagramSocket DPISSocket2 = null;
-		byte[] buffer = new byte[1000000];
-		switch (educationalInstitude) {
-		// Vanier College
-		case "van": {
-			message = "Vanier College :";
-			if (VanLibrary.size() > 0) {
-				for (Book book : VanLibrary.values()) {
-					if (book.index != 0) {
-						for (int i = 0; i < book.index; i++) {
-							Student student = StudentRecord
-									.get(book.assocStudents[i].userName);
-							if (book.assocStudents[i].getDueDays() >= days) {
-								message += student.firstName + " "
-										+ student.lastName + " "
-										+ student.phoneNumber + "\n";
+		
+		//default message for UDP call
+		String requestData 	= "nonReturn:"+days;
+		
+		switch (educationalInstitude) {		
+			// Vanier College
+			case "van": {
+				message = "Vanier College :";
+				if (VanLibrary.size() > 0) {
+					for (Book book : VanLibrary.values()) {
+						if (book.index != 0) {
+							for (int i = 0; i < book.index; i++) {
+								Student student = StudentRecord.get(book.assocStudents[i].userName);
+								if (book.assocStudents[i].getDueDays() >= days) {
+									message += student.firstName + " "
+																 + student.lastName + " "
+																 + student.phoneNumber + "\n";
+								}
 							}
 						}
 					}
 				}
-			}
-			
-			//UDP call to other server
-			try {
 				
-				// UDP server call to Concordia Server
-				DPISSocket = new DatagramSocket();
-				InetAddress aHost = InetAddress.getByName("localhost");
-				byte[] m = "send".getBytes();
-				DatagramPacket request = new DatagramPacket(m,
-						"send".length(), aHost, ConLibraryPort);
-				DPISSocket.send(request);
-				DatagramPacket reply = new DatagramPacket(buffer, buffer.length);
-				DPISSocket.receive(reply);
-				message += new String(reply.getData());
-				
-				// UDP server call to Dowson Collgee
-				DatagramPacket request1 = new DatagramPacket(m,
-						"send".length(), aHost, DowLibraryPort);
-				DPISSocket.send(request1);
-				DatagramPacket reply1 = new DatagramPacket(buffer,
-						buffer.length);
-				DPISSocket.receive(reply1);
-				message += new String(reply1.getData());
-			} catch (SocketException e) {
-				System.out.println("Socket: " + e.getMessage());
-			} catch (IOException e) {
-				System.out.println("IO: " + e.getMessage());
-			} finally {
-				if (DPISSocket != null)
-					DPISSocket.close();
+				//UDP call to other server
+				message += this.processUDPRequest(ConLibraryPort, requestData);
+				message += this.processUDPRequest(DowLibraryPort, requestData);
 			}
-		}
-		break;
-		
-		// For Concordia University
-		case "con": {
-			message = "\nConcordia University :";
-			if (ConLibrary.size() > 0) {
-				for (Book book : ConLibrary.values()) {
-					if (book.index != 0) {
-						for (int i = 0; i < book.index; i++) {
-							Student student = StudentRecord
-									.get(book.assocStudents[i].userName);
-							if (book.assocStudents[i].getDueDays() >= days) {
-								message += student.firstName + " "
-										+ student.lastName + " "
-										+ student.phoneNumber + "\n";
-							}
-						}
-					}
-				}
-			}
-			
-			//UDP call to other server
-			try {				
-				// UDP server call to Varnier college
-				DPISSocket1 = new DatagramSocket();
-				InetAddress aHost = InetAddress.getByName("localhost");
-				byte[] m = "send".getBytes();
-				DatagramPacket request = new DatagramPacket(m, "send".length(),
-						aHost, VanLibraryPort);
-				DPISSocket1.send(request);
-				DatagramPacket reply = new DatagramPacket(buffer, buffer.length);
-				DPISSocket1.receive(reply);
-				message += new String(reply.getData());
-				
-				// UDP server call to Dawson college
-				DatagramPacket request1 = new DatagramPacket(m,
-						"send".length(), aHost, DowLibraryPort);
-				DPISSocket1.send(request1);
-				DatagramPacket reply1 = new DatagramPacket(buffer,
-						buffer.length);
-				DPISSocket1.receive(reply1);
-				message += new String(reply1.getData());
-			} catch (SocketException e) {
-				System.out.println("Socket: " + e.getMessage());
-			} catch (Exception e) {
-				e.printStackTrace();
-			} finally {
-				if (DPISSocket1 != null)
-					DPISSocket1.close();
-			}
-		}
-		break;
-		
-		// Dowson College
-		case "dow": {
-			message = "Dowson College :";
-			if (DowLibrary.size() > 0) {
-				for (Book book : DowLibrary.values()) {
-					if (book.index != 0) {
-						for (int i = 0; i < book.index; i++) {
-							Student student = StudentRecord
-									.get(book.assocStudents[i].userName);
-							message += student.firstName + " "
-									+ student.lastName + " "
-									+ student.phoneNumber + "\n";
-						}
-					}
-				}
-			}
-			
-			//UDP call to other server
-			try {				
-				// UDP server call to Varnier college
-				DPISSocket2 = new DatagramSocket();
-				InetAddress aHost = InetAddress.getByName("localhost");
-				byte[] m = "send".getBytes();
-				DatagramPacket request = new DatagramPacket(m,
-						"send".length(), aHost, VanLibraryPort);
-				DPISSocket2.send(request);
-				DatagramPacket reply = new DatagramPacket(buffer, buffer.length);
-				DPISSocket2.receive(reply);
-				message += new String(reply.getData());
-				
-				// UDP server call to Concordia University
-				DatagramPacket request1 = new DatagramPacket(m, "send".length(), aHost, ConLibraryPort);
-				DPISSocket2.send(request1);
-				DatagramPacket reply1 = new DatagramPacket(buffer,
-						buffer.length);
-				DPISSocket2.receive(reply1);
-				message += new String(reply1.getData());
-			} catch (SocketException e) {
-				System.out.println("Socket: " + e.getMessage());
-			} catch (Exception e) {
-				e.printStackTrace();
-			} finally {
-				if (DPISSocket2 != null)
-					DPISSocket2.close();
-			}
-		}
 			break;
-		default: {
-		}
+			
+					
+			// For Concordia University
+			case "con": {
+				message = "Concordia University :";
+				if (ConLibrary.size() > 0) {
+					for (Book book : ConLibrary.values()) {
+						if (book.index != 0) {
+							for (int i = 0; i < book.index; i++) {
+								Student student = StudentRecord
+										.get(book.assocStudents[i].userName);
+								if (book.assocStudents[i].getDueDays() >= days) {
+								message += student.firstName + " "
+											+ student.lastName + " "
+											+ student.phoneNumber + "\n";
+								}
+							}
+						}
+					}
+				}			
+			
+				//UDP call to other server
+				message += this.processUDPRequest(VanLibraryPort, requestData);
+				message += this.processUDPRequest(DowLibraryPort, requestData);
+			}
+			break;
+			
+			// Dowson College
+			case "dow": {
+				message = "Dowson College :";
+				if (DowLibrary.size() > 0) {
+					for (Book book : DowLibrary.values()) {
+						if (book.index != 0) {
+							for (int i = 0; i < book.index; i++) {
+								Student student = StudentRecord.get(book.assocStudents[i].userName);
+								message += student.firstName + " "
+															 + student.lastName + " "
+															 + student.phoneNumber + "\n";
+							}
+						}
+					}
+				}			
+				
+				//UDP call to other server
+				message += this.processUDPRequest(VanLibraryPort, requestData);
+				message += this.processUDPRequest(ConLibraryPort, requestData);
+				
+			}
+			break;
+			
+			default: {}
 			break;
 		}
 		return message;
+	}
+	
+	private String processUDPRequest(int port, String requestData)
+	{
+		String response		   = null;
+		DatagramSocket aSocket = null;
+		
+		try {			
+			aSocket 				= new DatagramSocket();			
+			byte [] m 				= requestData.getBytes();
+			InetAddress aHost 		= InetAddress.getByName("localhost");
+			int serverPort 			= port;
+			DatagramPacket request 	= new DatagramPacket(m, requestData.length(), aHost, serverPort);
+			aSocket.send(request);
+			byte [] buffer 			= new byte[1000];
+			DatagramPacket reply 	= new DatagramPacket(buffer, buffer.length);
+			aSocket.receive(reply);
+			
+			response =  new String(reply.getData());
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally {
+			aSocket.close();
+		}
+		
+		return response;
 	}
 
 	/*
@@ -561,45 +454,49 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 	 * Vanier College UDP Server
 	 */
 	public class VanUdpServer implements Runnable {
+		
 		@Override
 		public void run() {
+			
 			String message = null;
 			DatagramSocket aSocket = null;
+			
 			try {
+				//UDP part
 				aSocket = new DatagramSocket(VanLibraryPort);
-				byte[] buffer = new byte[100000];
-				while (true) {
-					DatagramPacket request = new DatagramPacket(buffer,
-							buffer.length);
+				byte [] buffer = new byte[10000];
+				
+				while(true) {
+					DatagramPacket request = new DatagramPacket(buffer, buffer.length);
 					aSocket.receive(request);
 					String data = new String(request.getData());
-					if (data.equals("send")) {
-						message = "Vanier College :";
+					String[] requestParts = data.split(":");
+					String response = "";
+					if(requestParts.length == 2 ) {
+						
+						//non return request
+						message = "\nVanier College :";
 						if (VanLibrary.size() > 0) {
 							for (Book book : VanLibrary.values()) {
 								if (book.index != 0) {
 									for (int i = 0; i < book.index; i++) {
-										Student student = StudentRecord
-												.get(book.assocStudents[i].userName);
-										message += student.firstName + " "
-												+ student.lastName + " "
-												+ student.phoneNumber + "\n";
+										Student student = StudentRecord.get(book.assocStudents[i].userName);
+										message 	   += student.firstName + " "
+																			+ student.lastName + " "
+																			+ student.phoneNumber + "\n";
 									}
 								}
 							}
-						}						
-					} else {
-						String[] requestParts = data.split(":");
-						message = reserveBook(requestParts[1], "", requestParts[2], "")?"true":"false";
+						}
 						
+						response = message;						
 					}
-					
-					
-					
-					buffer = message.getBytes();
-					DatagramPacket reply = new DatagramPacket(buffer,
-							buffer.length, request.getAddress(),
-							request.getPort());
+					else {
+						//reserve request
+						response = reserveBook("", "", requestParts[1], requestParts[2])?"true":"false";
+					}
+						
+					DatagramPacket reply = new DatagramPacket(response.getBytes(), response.length(), request.getAddress(), request.getPort());
 					aSocket.send(reply);
 				}
 			} catch (SocketException e) {
@@ -619,96 +516,45 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 	public class ConUdpServer implements Runnable {
 		@Override
 		public void run() {
+			
 			String message = null;
 			DatagramSocket aSocket = null;
+			
 			try {
+				//UDP part
 				aSocket = new DatagramSocket(ConLibraryPort);
-				byte[] buffer = new byte[100000];
-				while (true) {
-					DatagramPacket request = new DatagramPacket(buffer,
-							buffer.length);
+				byte [] buffer = new byte[10000];
+				
+				while(true) {
+					DatagramPacket request = new DatagramPacket(buffer, buffer.length);
 					aSocket.receive(request);
 					String data = new String(request.getData());
-					if (data.equals("send")) {
-						message = "Concordia University :";
+					String[] requestParts = data.split(":");
+					String response = "";
+					if(requestParts.length == 2 ) {
+					//non return request
+						message = "\nVanier College :";
 						if (ConLibrary.size() > 0) {
 							for (Book book : ConLibrary.values()) {
 								if (book.index != 0) {
 									for (int i = 0; i < book.index; i++) {
-										Student student = StudentRecord
-												.get(book.assocStudents[i].userName);
-										message += student.firstName + " "
-												+ student.lastName + " "
-												+ student.phoneNumber + "\n";
+										Student student = StudentRecord.get(book.assocStudents[i].userName);
+										message        += student.firstName + " "
+																			+ student.lastName + " "
+																			+ student.phoneNumber + "\n";
 									}
 								}
 							}
-						}						
-					} else {
-						String[] requestParts = data.split(":");
-						message = reserveBook(requestParts[1], "", requestParts[2], "")?"true":"false";
+						}
 						
+						response = message;						
 					}
-					
-					
-					buffer = message.getBytes();
-					DatagramPacket reply = new DatagramPacket(buffer,
-							buffer.length, request.getAddress(),
-							request.getPort());
-					aSocket.send(reply);
-				}
-			} catch (SocketException e) {
-				System.out.println("Socket: " + e.getMessage());
-			} catch (Exception e) {
-				e.printStackTrace();
-			} finally {
-				if (aSocket != null)
-					aSocket.close();
-			}
-		}
-	}
-
-	/*
-	 * Dowson College UDP Server
-	 */
-	public class DowUdpServer implements Runnable {
-		@Override
-		public void run() {
-			String message = null;
-			DatagramSocket aSocket = null;
-			try {
-				aSocket = new DatagramSocket(DowLibraryPort);
-				byte[] buffer = new byte[100000];
-				while (true) {
-					DatagramPacket request = new DatagramPacket(buffer,
-							buffer.length);
-					aSocket.receive(request);
-					String data = new String(request.getData());
-					if (data.equals("send")) {
-						message = "Dowson College :";
-						if (DowLibrary.size() > 0) {
-							for (Book book : DowLibrary.values()) {
-								if (book.index != 0) {
-									for (int i = 0; i < book.index; i++) {
-										Student student = StudentRecord
-												.get(book.assocStudents[i].userName);
-										message += student.firstName + " "
-												+ student.lastName + " "
-												+ student.phoneNumber + "\n";
-									}
-								}
-							}
-						}						
-					} else {
-						String[] requestParts = data.split(":");
-						message = reserveBook(requestParts[1], "", requestParts[2], "")?"true":"false";
+					else {
+						//reserve request
+						response = reserveBook("", "", requestParts[1], requestParts[2])?"true":"false";
+					}
 						
-					}
-					
-					buffer = message.getBytes();
-					DatagramPacket reply = new DatagramPacket(buffer,
-							buffer.length, request.getAddress(),
-							request.getPort());
+					DatagramPacket reply = new DatagramPacket(response.getBytes(), response.length(), request.getAddress(), request.getPort());
 					aSocket.send(reply);
 				}
 			} catch (SocketException e) {
@@ -720,6 +566,63 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 					aSocket.close();
 			}
 		}
+	}
+
+	/*
+	 * Dowson College UDP Server
+	 */
+	public class DowUdpServer implements Runnable {
+		
+		@Override
+		public void run() {
+			String message = null;
+			DatagramSocket aSocket = null;
+			
+			try {
+				//UDP part
+				aSocket = new DatagramSocket(DowLibraryPort);
+				byte [] buffer = new byte[10000];
+				
+				while(true) {
+					DatagramPacket request = new DatagramPacket(buffer, buffer.length);
+					aSocket.receive(request);
+					String data = new String(request.getData());
+					String[] requestParts = data.split(":");
+					String response = "";
+					if(requestParts.length == 2 ) {
+					//non return request
+						message = "\nDowson College :";
+						if (DowLibrary.size() > 0) {
+							for (Book book : DowLibrary.values()) {
+								if (book.index != 0) {
+									for (int i = 0; i < book.index; i++) {
+										Student student = StudentRecord.get(book.assocStudents[i].userName);
+										message        += student.firstName + " "
+																			+ student.lastName + " "
+																			+ student.phoneNumber + "\n";
+									}
+								}
+							}
+						}
+						
+						response = message;						
+					}
+					else {
+						//reserve request
+						response = reserveBook("", "", requestParts[1], requestParts[2])?"true":"false";
+					}
+						
+					DatagramPacket reply = new DatagramPacket(response.getBytes(), response.length(), request.getAddress(), request.getPort());
+					aSocket.send(reply);
+				}
+			} catch (SocketException e) {
+				System.out.println("Socket: " + e.getMessage());
+			} catch (IOException e) {
+				System.out.println("IO: " + e.getMessage());
+			} finally {
+				if (aSocket != null)
+					aSocket.close();
+			}		}
 	}
 
 	/*
@@ -753,7 +656,7 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 	 * @throws: SecurityException
 	 */
 	public static void logFile(String fileName, String Operation) throws SecurityException {
-		fileName = fileName + "_server_log.txt";
+		fileName = fileName + "_log.txt";
 		File log = new File(fileName);
 		try {
 			if (!log.exists()) {
@@ -815,7 +718,7 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 	}
 	
 	/**
-	* Run thread + UDP server
+	* Run CORBA Server by threading
 	*/
 	public void run()
 	{				
