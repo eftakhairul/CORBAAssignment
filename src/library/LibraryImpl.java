@@ -225,7 +225,7 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 									   String authorName) {
 		
 		
-		boolean output = this.reserveBook(username, 
+		boolean output = reserveBook(username, 
 									 	  password,
 									      bookName, 
 									      authorName);
@@ -234,13 +234,15 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 		if (output == false) {
 			
 			String requestData = "reserve:"+username+":"+bookName;
+			logFile("debug", "request data: " + requestData);
+			
 			switch (this.instituteName) {			
 			// Vanier college
 			case "van": {
-				String liboutput =  this.processUDPRequest(ConLibraryPort, requestData);				
-				if (liboutput.equals("false")) {
+				boolean liboutput =  this.processsUDPRequest(ConLibraryPort, requestData);				
+				if (!liboutput) {
 					output = true;					
-					liboutput =  this.processUDPRequest(DowLibraryPort, requestData);										
+					liboutput =  this.processsUDPRequest(DowLibraryPort, requestData);										
 				}
 				
 								
@@ -249,20 +251,20 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 			
 			// Concordia University
 			case "con": {
-				String liboutput =  this.processUDPRequest(ConLibraryPort, requestData);				
-				if (liboutput.equals("false")) {
+				boolean liboutput =  this.processsUDPRequest(VanLibraryPort, requestData);				
+				if (!liboutput) {
 					output = true;					
-					liboutput =  this.processUDPRequest(DowLibraryPort, requestData);										
+					liboutput =  this.processsUDPRequest(DowLibraryPort, requestData);										
 				}
 			}
 			break;
 			
 			// Dawson College
 			case "dow": {
-				String liboutput =  this.processUDPRequest(ConLibraryPort, requestData);				
-				if (liboutput.equals("false")) {
-					output = true;					
-					liboutput =  this.processUDPRequest(DowLibraryPort, requestData);										
+				boolean liboutput =  this.processsUDPRequest(ConLibraryPort, requestData);				
+				if (!liboutput) {
+					output = true;							
+					liboutput =  this.processsUDPRequest(VanLibraryPort, requestData);										
 				}				
 			}
 			break;
@@ -380,6 +382,13 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 		return message;
 	}
 	
+	/*
+	 * Taking data port and data and work as UDP client
+	 * 
+	 * @param port
+	 * @param requestData
+	 * @param numDays
+	 */
 	private String processUDPRequest(int port, String requestData)
 	{
 		String response		   = null;
@@ -392,7 +401,7 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 			int serverPort 			= port;
 			DatagramPacket request 	= new DatagramPacket(m, requestData.length(), aHost, serverPort);
 			aSocket.send(request);
-			byte [] buffer 			= new byte[1000];
+			byte [] buffer 			= new byte[10000];
 			DatagramPacket reply 	= new DatagramPacket(buffer, buffer.length);
 			aSocket.receive(reply);
 			
@@ -405,6 +414,8 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 		
 		return response;
 	}
+	
+
 
 	/*
 	 * Debug Tool to set custom numOfDays
@@ -492,8 +503,8 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 						response = message;						
 					}
 					else {
-						//reserve request
-						response = reserveBook("", "", requestParts[1], requestParts[2])?"true":"false";
+						//reserve request					
+						response = reserveBook(requestParts[1], "", requestParts[2], "")?"true":"false";
 					}
 						
 					DatagramPacket reply = new DatagramPacket(response.getBytes(), response.length(), request.getAddress(), request.getPort());
@@ -550,8 +561,8 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 						response = message;						
 					}
 					else {
-						//reserve request
-						response = reserveBook("", "", requestParts[1], requestParts[2])?"true":"false";
+						//reserve request					
+						response = reserveBook(requestParts[1], "", requestParts[2], "")?"true":"false";
 					}
 						
 					DatagramPacket reply = new DatagramPacket(response.getBytes(), response.length(), request.getAddress(), request.getPort());
@@ -608,8 +619,9 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 						response = message;						
 					}
 					else {
-						//reserve request
-						response = reserveBook("", "", requestParts[1], requestParts[2])?"true":"false";
+						//reserve request					
+						response = reserveBook(requestParts[1], "", requestParts[2], "")?"true":"false";
+				
 					}
 						
 					DatagramPacket reply = new DatagramPacket(response.getBytes(), response.length(), request.getAddress(), request.getPort());
@@ -647,6 +659,47 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 			}
 		}
 	}
+	
+	private boolean processsUDPRequest(int port, String requestData)
+	{
+		
+		boolean reserveBookeRecordFlag = false;
+		String[] requestParts = requestData.split(":");
+		Book book = null;
+		switch (port) {
+		case 3000: {
+			book = VanLibrary.get(requestParts[2]);
+		}
+		break;			
+		
+		case 4000: {
+			book = ConLibrary.get(requestParts[2]);
+		
+		}
+		break;	
+
+		case 5000: {
+			book = DowLibrary.get(requestParts[2]);
+			
+		}
+		break;
+		
+		default: {}
+		break;
+	}
+		
+		
+		if (book != null) {
+			synchronized (book) {
+				reserveBookeRecordFlag = book.addBook(requestParts[1]);
+				logFile("reserve_book", "Vanier: One book :" + requestParts[2]
+						+ " is reserved for student: "
+						+ requestParts[1]);
+			}
+		}
+		return reserveBookeRecordFlag;
+		
+	}
 
 	/*
 	 * logs the activities of servers
@@ -681,16 +734,18 @@ public class LibraryImpl extends LibraryServerPOA implements Runnable {
 		Book bookA = new Book("english", "aa", 3);
 		Book bookB = new Book("french", "bb", 3);
 		
-		// Vanlien Library Book insertion
-		VanLibrary.put("english", bookA);
-		VanLibrary.put("french", bookB);
-		System.out.println("Varnier's books are: english (3 copies), french(3 copies)");
-		// Concordia Library Book insertion
-		bookA = new Book("cuda", "nicholas", 2);
-		bookB = new Book("opencl", "munshi", 3);
-		ConLibrary.put("cuda", bookA);
-		ConLibrary.put("opencl", bookB);
-		System.out.println("Concordia's books are: cuda (2 copies), opencl (3 copies)");
+//		// Vanlien Library Book insertion
+//		VanLibrary.put("english", bookA);
+//		VanLibrary.put("french", bookB);
+//		System.out.println("Varnier's books are: english (3 copies), french(3 copies)");
+//		
+//		
+//		// Concordia Library Book insertion
+//		bookA = new Book("cuda", "nicholas", 2);
+//		bookB = new Book("opencl", "munshi", 3);
+//		ConLibrary.put("cuda", bookA);
+//		ConLibrary.put("opencl", bookB);
+//		System.out.println("Concordia's books are: cuda (2 copies), opencl (3 copies)");
 		
 		// Dowson ULibrary Book insertion
 		bookA = new Book("3dmath", "plecher", 1);
